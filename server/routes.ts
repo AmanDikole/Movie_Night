@@ -1,7 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from 'ws';
-import { ExpressPeerServer } from 'peer';
 import { storage } from "./storage";
 import { WebSocketMessage, insertRoomSchema, insertParticipantSchema, insertMessageSchema, insertPlaybackStateSchema } from "@shared/schema";
 import { log } from "./vite";
@@ -12,11 +11,12 @@ const clients = new Map<string, { ws: WebSocket, roomId: string, username: strin
 
 // Send message to all clients in a room
 function broadcastToRoom(roomId: string, message: WebSocketMessage, excludeClient?: WebSocket) {
-  for (const [id, client] of clients.entries()) {
+  // Use forEach instead of for...of to avoid MapIterator issue
+  clients.forEach((client, id) => {
     if (client.roomId === roomId && client.ws !== excludeClient && client.ws.readyState === WebSocket.OPEN) {
       client.ws.send(JSON.stringify(message));
     }
-  }
+  });
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -82,14 +82,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Create HTTP server
   const httpServer = createServer(app);
-  
-  // Set up PeerJS server
-  const peerServer = ExpressPeerServer(httpServer, {
-    debug: true,
-    path: '/peerjs'
-  });
-  
-  app.use('/peerjs', peerServer);
   
   // WebSocket server
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });

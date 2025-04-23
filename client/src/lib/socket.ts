@@ -22,12 +22,13 @@ export const connectToSocket = () => {
   socket = new WebSocket(wsUrl);
   
   socket.onopen = () => {
-    console.log("WebSocket connection established");
+    console.log("WebSocket connection established successfully");
     connectHandlers.forEach(handler => handler());
   };
   
   socket.onmessage = (event) => {
     try {
+      console.log("WebSocket message received:", event.data);
       const message = JSON.parse(event.data) as WebSocketMessage;
       messageHandlers.forEach(handler => handler(message));
     } catch (error) {
@@ -35,10 +36,18 @@ export const connectToSocket = () => {
     }
   };
   
-  socket.onclose = () => {
-    console.log("WebSocket connection closed");
+  socket.onclose = (event) => {
+    console.log("WebSocket connection closed with code:", event.code, "reason:", event.reason);
     socket = null;
     disconnectHandlers.forEach(handler => handler());
+    
+    // Attempt to reconnect after a delay unless it was a normal closure
+    if (event.code !== 1000) {
+      console.log("Attempting to reconnect in 3 seconds...");
+      setTimeout(() => {
+        connectToSocket();
+      }, 3000);
+    }
   };
   
   socket.onerror = (error) => {

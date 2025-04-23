@@ -13,7 +13,7 @@ export const initializePeer = async (username: string): Promise<{
   peerId: string;
   localStream: MediaStream | null;
 }> => {
-  // Create new peer with random ID and expanded ICE server configuration
+  // Create new peer with random ID and using public STUN servers
   peer = new Peer({
     config: {
       iceServers: [
@@ -26,10 +26,6 @@ export const initializePeer = async (username: string): Promise<{
       ],
     },
     debug: 3,
-    host: window.location.hostname,
-    port: Number(window.location.port) || (window.location.protocol === 'https:' ? 443 : 80),
-    path: '/peerjs',
-    secure: window.location.protocol === 'https:'
   });
   
   return new Promise((resolve, reject) => {
@@ -72,6 +68,26 @@ export const initializePeer = async (username: string): Promise<{
     
     peer!.on("error", (err) => {
       console.error("PeerJS error:", err);
+      
+      // Handle specific error types
+      if (err.type === 'peer-unavailable') {
+        console.log("The peer you're trying to connect to is not available");
+      } else if (err.type === 'network' || err.type === 'server-error') {
+        console.log("Network or server error, will attempt to reconnect");
+        
+        // Clean up and try to reconnect
+        if (peer) {
+          peer.destroy();
+          peer = null;
+        }
+        
+        // Wait before attempting to reconnect
+        setTimeout(() => {
+          // Note: The component using this would need to reinitialize
+          console.log("Attempting to reconnect PeerJS...");
+        }, 3000);
+      }
+      
       reject(err);
     });
   });
@@ -104,9 +120,18 @@ export const callPeer = (peerId: string, metadata?: any): void => {
   }
   
   try {
+    console.log(`Attempting to call peer with ID: ${peerId}`);
     const call = peer.call(peerId, localStream, { metadata });
     
+    // Set a timeout to detect if the call doesn't connect
+    const callTimeout = setTimeout(() => {
+      console.log(`Call to peer ${peerId} timed out after 10 seconds`);
+      // Cleanup any pending call state if needed
+    }, 10000);
+    
     call.on("stream", (remoteStream) => {
+      clearTimeout(callTimeout); // Clear the timeout as connection succeeded
+      console.log(`Received stream from peer: ${peerId}`);
       remoteStreams[peerId] = remoteStream;
       
       // Notify callbacks
@@ -116,6 +141,8 @@ export const callPeer = (peerId: string, metadata?: any): void => {
     });
     
     call.on("close", () => {
+      clearTimeout(callTimeout); // Clear the timeout if call closes
+      console.log(`Call closed with peer: ${peerId}`);
       delete remoteStreams[peerId];
       
       // Notify callbacks
@@ -123,7 +150,8 @@ export const callPeer = (peerId: string, metadata?: any): void => {
     });
     
     call.on("error", (err) => {
-      console.error("Call error:", err);
+      clearTimeout(callTimeout); // Clear the timeout on error
+      console.error(`Call error with peer ${peerId}:`, err);
     });
   } catch (error) {
     console.error("Error calling peer:", error);
