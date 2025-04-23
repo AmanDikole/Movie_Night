@@ -58,12 +58,12 @@ const VideoCallSection = ({
   }, [localStream, remoteStreams, username]);
   
   return (
-    <div className="bg-darkgray">
+    <div className="absolute bottom-24 right-4 z-30 max-w-[240px] rounded-lg shadow-lg bg-darkgray overflow-hidden">
       {/* Video streams grid */}
-      <div className="overflow-x-auto">
-        <div className="video-call-grid p-2" style={{ gridAutoFlow: "column" }}>
+      <div className="overflow-hidden">
+        <div className="flex flex-wrap video-call-grid p-1">
           {streams.map((stream, index) => (
-            <div key={index} className="relative">
+            <div key={index} className="w-full relative mb-1">
               <div className="aspect-video bg-lightgray rounded-lg overflow-hidden relative">
                 <VideoStream 
                   stream={stream.stream} 
@@ -82,7 +82,7 @@ const VideoCallSection = ({
             p.username !== username && 
             !Object.values(remoteStreams).some(s => s.username === p.username)
           ).map((participant, index) => (
-            <div key={`placeholder-${index}`} className="relative">
+            <div key={`placeholder-${index}`} className="w-full relative mb-1">
               <div className="aspect-video bg-lightgray rounded-lg overflow-hidden relative">
                 <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
                   <i className="fas fa-video-slash text-gray-400"></i>
@@ -93,45 +93,43 @@ const VideoCallSection = ({
               </div>
             </div>
           ))}
-          
-          {/* Invite button */}
-          <div className="flex items-center space-x-2 px-2">
-            <button 
-              className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white" 
-              title="Invite"
-              onClick={() => {
-                // Copy current URL to clipboard
-                navigator.clipboard.writeText(window.location.href);
-              }}
-            >
-              <i className="fas fa-plus"></i>
-            </button>
-          </div>
         </div>
       </div>
       
       {/* Video controls */}
-      <div className="flex items-center justify-center p-2 space-x-4 border-t border-gray-800">
+      <div className="flex items-center justify-center p-1 space-x-2 border-t border-gray-800">
         <button 
-          className={`w-10 h-10 rounded-full ${isMicOn ? 'bg-lightgray' : 'bg-error'} flex items-center justify-center text-white hover:bg-gray-600 transition`} 
+          className={`w-8 h-8 rounded-full ${isMicOn ? 'bg-lightgray' : 'bg-error'} flex items-center justify-center text-white hover:bg-gray-600 transition`} 
           title="Toggle Microphone"
           onClick={onToggleMic}
         >
-          <i className={`fas ${isMicOn ? 'fa-microphone' : 'fa-microphone-slash'}`}></i>
+          <i className={`fas ${isMicOn ? 'fa-microphone' : 'fa-microphone-slash'} text-xs`}></i>
         </button>
         <button 
-          className={`w-10 h-10 rounded-full ${isCameraOn ? 'bg-lightgray' : 'bg-error'} flex items-center justify-center text-white hover:bg-gray-600 transition`}
+          className={`w-8 h-8 rounded-full ${isCameraOn ? 'bg-lightgray' : 'bg-error'} flex items-center justify-center text-white hover:bg-gray-600 transition`}
           title="Toggle Camera"
           onClick={onToggleCamera}
         >
-          <i className={`fas ${isCameraOn ? 'fa-video' : 'fa-video-slash'}`}></i>
+          <i className={`fas ${isCameraOn ? 'fa-video' : 'fa-video-slash'} text-xs`}></i>
         </button>
         <button 
-          className="w-10 h-10 rounded-full bg-error flex items-center justify-center text-white hover:opacity-80 transition" 
+          className="w-8 h-8 rounded-full bg-error flex items-center justify-center text-white hover:opacity-80 transition" 
           title="Leave Call"
           onClick={onLeaveCall}
         >
-          <i className="fas fa-phone-slash"></i>
+          <i className="fas fa-phone-slash text-xs"></i>
+        </button>
+        <button 
+          className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white" 
+          title="Invite"
+          onClick={() => {
+            // Copy current URL to clipboard
+            navigator.clipboard.writeText(window.location.href);
+            // Show toast or notification
+            alert("Room link copied to clipboard!");
+          }}
+        >
+          <i className="fas fa-plus text-xs"></i>
         </button>
       </div>
     </div>
