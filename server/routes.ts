@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from 'ws';
+import { ExpressPeerServer } from 'peer';
 import { storage } from "./storage";
 import { WebSocketMessage, insertRoomSchema, insertParticipantSchema, insertMessageSchema, insertPlaybackStateSchema } from "@shared/schema";
 import { log } from "./vite";
@@ -81,6 +82,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Create HTTP server
   const httpServer = createServer(app);
+  
+  // Set up PeerJS server
+  const peerServer = ExpressPeerServer(httpServer, {
+    debug: true,
+    path: '/peerjs'
+  });
+  
+  app.use('/peerjs', peerServer);
   
   // WebSocket server
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });

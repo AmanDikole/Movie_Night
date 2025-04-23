@@ -13,9 +13,12 @@ export const connectToSocket = () => {
     return socket;
   }
   
+  // For Replit, we need to use the current hostname rather than localhost
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const wsUrl = `${protocol}//${window.location.host}/ws`;
+  const host = window.location.host;
+  const wsUrl = `${protocol}//${host}/ws`;
   
+  console.log(`Connecting to WebSocket at: ${wsUrl}`);
   socket = new WebSocket(wsUrl);
   
   socket.onopen = () => {

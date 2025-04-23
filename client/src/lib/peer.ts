@@ -13,15 +13,23 @@ export const initializePeer = async (username: string): Promise<{
   peerId: string;
   localStream: MediaStream | null;
 }> => {
-  // Create new peer with random ID
+  // Create new peer with random ID and expanded ICE server configuration
   peer = new Peer({
     config: {
       iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:global.stun.twilio.com:3478" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:stun3.l.google.com:19302" },
+        { urls: "stun:stun4.l.google.com:19302" },
+        { urls: "stun:global.stun.twilio.com:3478" }
       ],
     },
     debug: 3,
+    host: window.location.hostname,
+    port: Number(window.location.port) || (window.location.protocol === 'https:' ? 443 : 80),
+    path: '/peerjs',
+    secure: window.location.protocol === 'https:'
   });
   
   return new Promise((resolve, reject) => {
