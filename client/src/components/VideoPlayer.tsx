@@ -5,9 +5,6 @@ import { PlaybackState } from "@shared/schema";
 import VideoControls from "./VideoControls";
 import { toast } from "@/hooks/use-toast";
 
-// Force lazy load of YouTube player
-const YouTubePlayer = ReactPlayerYoutube;
-
 interface VideoPlayerProps {
   url: string;
   initialPlaybackState?: PlaybackState | null;
@@ -186,10 +183,7 @@ const VideoPlayer = ({
     }
   };
   
-  // Determine if it's a YouTube URL
-  const isYoutubeVideo = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/.test(videoUrl || '');
-  
-  console.log("Is YouTube URL?", isYoutubeVideo, "URL:", videoUrl);
+  console.log("Video URL:", videoUrl);
   
   return (
     <div
@@ -197,69 +191,47 @@ const VideoPlayer = ({
       className="video-container relative flex-1 flex items-center justify-center bg-black"
     >
       {videoUrl && (
-        isYoutubeVideo ? (
-          <YouTubePlayer
-            ref={playerRef}
-            url={videoUrl}
-            width="100%"
-            height="100%"
-            playing={isPlaying}
-            volume={isMuted ? 0 : volume}
-            onDuration={handleDuration}
-            onProgress={handleProgress}
-            onBuffer={() => setIsBuffering(true)}
-            onBufferEnd={() => setIsBuffering(false)}
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
-            onReady={handlePlayerReady}
-            onError={handlePlayerError}
-            style={{ position: "absolute", top: 0, left: 0 }}
-            config={{
-              youtube: {
-                playerVars: { 
-                  modestbranding: 1,
-                  origin: window.location.origin,
-                  autoplay: isPlaying ? 1 : 0,
-                  controls: 0,
-                  rel: 0,
-                  showinfo: 0,
-                  iv_load_policy: 3,
-                  fs: 0
-                }
+        <ReactPlayer
+          ref={playerRef}
+          url={videoUrl}
+          width="100%"
+          height="100%"
+          playing={isPlaying}
+          volume={isMuted ? 0 : volume}
+          onDuration={handleDuration}
+          onProgress={handleProgress}
+          onBuffer={() => setIsBuffering(true)}
+          onBufferEnd={() => setIsBuffering(false)}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onReady={handlePlayerReady}
+          onError={handlePlayerError}
+          style={{ position: "absolute", top: 0, left: 0 }}
+          controls={false}
+          playsinline={true}
+          config={{
+            youtube: {
+              playerVars: { 
+                modestbranding: 1,
+                origin: window.location.origin,
+                autoplay: isPlaying ? 1 : 0,
+                controls: 0,
+                rel: 0,
+                showinfo: 0,
+                iv_load_policy: 3,
+                fs: 0
               }
-            }}
-          />
-        ) : (
-          <ReactPlayer
-            ref={playerRef}
-            url={videoUrl}
-            width="100%"
-            height="100%"
-            playing={isPlaying}
-            volume={isMuted ? 0 : volume}
-            onDuration={handleDuration}
-            onProgress={handleProgress}
-            onBuffer={() => setIsBuffering(true)}
-            onBufferEnd={() => setIsBuffering(false)}
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
-            onReady={handlePlayerReady}
-            onError={handlePlayerError}
-            style={{ position: "absolute", top: 0, left: 0 }}
-            controls={false}
-            playsinline={true}
-            config={{
-              file: {
-                attributes: {
-                  style: {
-                    objectFit: "contain",
-                  }
-                },
-                forceVideo: true,
+            },
+            file: {
+              attributes: {
+                style: {
+                  objectFit: "contain",
+                }
               },
-            }}
-          />
-        )
+              forceVideo: true,
+            },
+          }}
+        />
       )}
       
       {/* Loading overlay */}
