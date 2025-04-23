@@ -1,12 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import OnboardingScreen from "@/components/OnboardingScreen";
 
 const Home = () => {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Debug to see the current location
+  useEffect(() => {
+    console.log("Current location:", location);
+  }, [location]);
 
   const handleCreateRoom = async (name: string, videoUrl: string) => {
     try {
