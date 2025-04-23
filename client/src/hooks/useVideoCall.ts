@@ -21,34 +21,60 @@ const useVideoCall = (roomId: string, username: string) => {
   // Initialize peer connection and setup media stream
   useEffect(() => {
     let cleanup: (() => void) | null = null;
+    let retryCount = 0;
+    const maxRetries = 3;
     
     const setupPeer = async () => {
       try {
+        console.log("Setting up peer connection...");
+        
         // Initialize WebRTC peer connection
         const { peer, peerId, localStream: stream } = await initializePeer(username);
         setPeerId(peerId);
+        console.log(`Peer initialized successfully with ID: ${peerId}`);
         
         // Setup local media stream
         if (!stream) {
-          const newStream = await getLocalStream(); 
-          setLocalStream(newStream);
-          setIsCameraOn(true);
-          setIsMicOn(true);
+          try {
+            console.log("Getting local media stream...");
+            const newStream = await getLocalStream();
+            setLocalStream(newStream);
+            setIsCameraOn(true);
+            setIsMicOn(true);
+            console.log("Local media stream obtained successfully");
+          } catch (mediaError) {
+            console.error("Failed to get media stream:", mediaError);
+            // Fallback to audio-only if camera fails
+            try {
+              console.log("Attempting audio-only fallback...");
+              const audioOnlyStream = await getLocalStream(true); // audio only
+              setLocalStream(audioOnlyStream);
+              setIsCameraOn(false);
+              setIsMicOn(true);
+              console.log("Audio-only stream obtained successfully");
+            } catch (audioError) {
+              console.error("Failed to get audio-only stream:", audioError);
+            }
+          }
         } else {
           setLocalStream(stream);
+          setIsCameraOn(stream.getVideoTracks().length > 0);
+          setIsMicOn(stream.getAudioTracks().length > 0);
         }
         
         // Handle remote streams
         const unsubscribeRemoteStream = onRemoteStream((remotePeerId, stream, metadata) => {
+          console.log(`Received remote stream from peer: ${remotePeerId}`, metadata);
           const { username } = metadata || {};
           setRemoteStreams(prev => ({
             ...prev,
-            [remotePeerId]: { stream, username }
+            [remotePeerId]: { stream, username: username || 'Unknown User' }
           }));
         });
         
         // Handle peer disconnection
         const unsubscribePeerDisconnect = onPeerDisconnected((remotePeerId) => {
+          console.log(`Peer disconnected: ${remotePeerId}`);
           setRemoteStreams(prev => {
             const newStreams = { ...prev };
             delete newStreams[remotePeerId];
@@ -59,14 +85,21 @@ const useVideoCall = (roomId: string, username: string) => {
         // Listen for new peers from WebSocket
         const unsubscribeMessageHandler = addMessageHandler((message) => {
           if (message.type === "new_peer") {
-            const { peerId: remotePeerId, username } = message.payload;
-            if (remotePeerId && username && remotePeerId !== peerId) {
+            const { peerId: remotePeerId, username: remoteUsername } = message.payload;
+            console.log(`New peer notification: ${remotePeerId} (${remoteUsername})`);
+            
+            if (remotePeerId && remoteUsername && remotePeerId !== peerId) {
+              console.log(`Initiating call to peer: ${remotePeerId}`);
               callPeer(remotePeerId, { username });
             }
           }
         });
         
+        // Reset retry count on successful connection
+        retryCount = 0;
+        
         cleanup = () => {
+          console.log("Cleaning up video call resources...");
           unsubscribeRemoteStream();
           unsubscribePeerDisconnect();
           unsubscribeMessageHandler();
@@ -74,6 +107,17 @@ const useVideoCall = (roomId: string, username: string) => {
         };
       } catch (error) {
         console.error("Error setting up video call:", error);
+        
+        // Retry logic for connection failures
+        if (retryCount < maxRetries) {
+          retryCount++;
+          const delay = 2000 * retryCount; // Exponential backoff
+          console.log(`Retrying peer connection in ${delay/1000} seconds... (Attempt ${retryCount}/${maxRetries})`);
+          
+          setTimeout(() => {
+            setupPeer();
+          }, delay);
+        }
       }
     };
     

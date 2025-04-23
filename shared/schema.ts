@@ -110,6 +110,6 @@ export type PeerInfo = {
 };
 
 export type WebSocketMessage = {
-  type: 'join_room' | 'leave_room' | 'chat_message' | 'video_state' | 'new_peer' | 'peer_left';
+  type: 'join_room' | 'leave_room' | 'chat_message' | 'video_state' | 'new_peer' | 'peer_left' | 'join_room_success' | 'error';
   payload: any;
 };

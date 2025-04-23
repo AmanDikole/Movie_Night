@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Room, Participant, Message, PlaybackState, WebSocketMessage } from "@shared/schema";
-import { connectToSocket, disconnectFromSocket, sendMessage, addMessageHandler } from "@/lib/socket";
+import { connectToSocket, disconnectFromSocket, sendMessage, addMessageHandler, addConnectHandler } from "@/lib/socket";
 
 const useRoom = (roomId: string, username: string) => {
   const [room, setRoom] = useState<Room | null>(null);
@@ -12,38 +12,87 @@ const useRoom = (roomId: string, username: string) => {
   // Fetch initial room data
   const { isLoading, error } = useQuery({
     queryKey: [`/api/rooms/${roomId}`],
-    onSuccess: (data) => {
+    enabled: !!roomId && !!username,
+    onSuccess: (data: any) => {
       setRoom(data.room);
       setParticipants(data.participants);
       setMessages(data.messages);
       setPlaybackState(data.playbackState);
-    },
-    enabled: !!roomId && !!username,
+    }
   });
   
   // Connect to WebSocket and join room
   useEffect(() => {
     if (!roomId || !username) return;
     
-    // Connect to WebSocket
-    const socket = connectToSocket();
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
     
-    // Join room when WebSocket is open
-    const joinRoom = () => {
+    const joinRoomHandler = () => {
+      console.log(`Joining room: ${roomId} as ${username}`);
       sendMessage({
         type: "join_room",
         payload: { roomId, username },
       });
     };
     
-    if (socket.readyState === WebSocket.OPEN) {
-      joinRoom();
-    } else {
-      socket.addEventListener("open", joinRoom);
-    }
+    const setupConnection = () => {
+      // Connect to WebSocket
+      console.log("Setting up WebSocket connection...");
+      const socket = connectToSocket();
+      
+      // Join room when WebSocket is open
+      if (socket.readyState === WebSocket.OPEN) {
+        console.log("WebSocket already open, joining room immediately");
+        joinRoomHandler();
+      } else {
+        console.log("WebSocket connecting, will join room when open");
+        socket.addEventListener("open", joinRoomHandler);
+      }
+    };
+    
+    // Connection success handler
+    const handleConnectionSuccess = () => {
+      console.log("WebSocket connection successful");
+      reconnectAttempts = 0; // Reset reconnect attempts on successful connection
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
+      }
+    };
+    
+    // Connection error/close handler
+    const handleConnectionFailure = () => {
+      if (reconnectAttempts < maxReconnectAttempts) {
+        reconnectAttempts++;
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000); // Exponential backoff with max 30s
+        console.log(`WebSocket connection failed. Reconnecting in ${delay/1000}s (attempt ${reconnectAttempts}/${maxReconnectAttempts})...`);
+        
+        if (reconnectTimeout) {
+          clearTimeout(reconnectTimeout);
+        }
+        
+        reconnectTimeout = setTimeout(() => {
+          setupConnection();
+        }, delay);
+      } else {
+        console.error(`Failed to connect after ${maxReconnectAttempts} attempts.`);
+      }
+    };
+    
+    // Initial connection setup
+    setupConnection();
+    
+    // Add connection success handler
+    const removeConnectHandler = addConnectHandler(() => {
+      handleConnectionSuccess();
+    });
     
     // Set up message handler
     const removeMessageHandler = addMessageHandler((message: WebSocketMessage) => {
+      console.log("WebSocket message received:", message.type);
+      
       switch (message.type) {
         case "join_room_success":
           const { room, participants, messages } = message.payload;
@@ -79,12 +128,21 @@ const useRoom = (roomId: string, username: string) => {
     
     // Clean up on unmount
     return () => {
+      console.log("Cleaning up room connection...");
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      
+      removeConnectHandler();
       removeMessageHandler();
       
-      sendMessage({
-        type: "leave_room",
-        payload: { roomId, username },
-      });
+      // Attempt to send leave message before disconnecting
+      if (roomId && username) {
+        sendMessage({
+          type: "leave_room",
+          payload: { roomId, username },
+        });
+      }
       
       disconnectFromSocket();
     };
