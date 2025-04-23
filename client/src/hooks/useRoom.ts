@@ -1,24 +1,34 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Room, Participant, Message, PlaybackState, WebSocketMessage } from "@shared/schema";
+import { Room as RoomType, Participant, Message, PlaybackState, WebSocketMessage } from "@shared/schema";
 import { connectToSocket, disconnectFromSocket, sendMessage, addMessageHandler, addConnectHandler } from "@/lib/socket";
 
 const useRoom = (roomId: string, username: string) => {
-  const [room, setRoom] = useState<Room | null>(null);
+  const [room, setRoom] = useState<RoomType | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [playbackState, setPlaybackState] = useState<PlaybackState | null>(null);
+  
+  // Function to update state when room data is received
+  const updateRoomData = useCallback((data: any) => {
+    console.log("Room data received:", data);
+    setRoom(data.room);
+    setParticipants(data.participants);
+    setMessages(data.messages);
+    setPlaybackState(data.playbackState);
+  }, []);
   
   // Fetch initial room data
   const { isLoading, error } = useQuery({
     queryKey: [`/api/rooms/${roomId}`],
     enabled: !!roomId && !!username,
-    onSuccess: (data: any) => {
-      setRoom(data.room);
-      setParticipants(data.participants);
-      setMessages(data.messages);
-      setPlaybackState(data.playbackState);
-    }
+    staleTime: Infinity,
+    select: (data: any) => data,
+    placeholderData: null,
+    gcTime: 0,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false
   });
   
   // Connect to WebSocket and join room
