@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import ReactPlayer from "react-player";
+import ReactPlayerYoutube from "react-player/youtube";
 import { PlaybackState } from "@shared/schema";
 import VideoControls from "./VideoControls";
+import { toast } from "@/hooks/use-toast";
 
 interface VideoPlayerProps {
   url: string;
@@ -9,6 +11,33 @@ interface VideoPlayerProps {
   onPlaybackChange: (state: { isPlaying: boolean; currentTime: number }) => void;
   isHost: boolean;
 }
+
+// Helper function to ensure we have a valid YouTube embed URL
+const getProperYoutubeUrl = (url: string): string => {
+  // Already an embed URL
+  if (url.includes('youtube.com/embed/')) {
+    return url;
+  }
+  
+  // Extract video ID from watch URL
+  if (url.includes('youtube.com/watch')) {
+    const videoId = new URL(url).searchParams.get('v');
+    if (videoId) {
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+  }
+  
+  // Extract video ID from shortened URL
+  if (url.includes('youtu.be/')) {
+    const videoId = url.split('youtu.be/')[1]?.split('?')[0];
+    if (videoId) {
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+  }
+  
+  // If we couldn't parse it, return the original URL
+  return url;
+};
 
 const VideoPlayer = ({
   url,
@@ -23,6 +52,7 @@ const VideoPlayer = ({
   const [volume, setVolume] = useState(0.8);
   const [isMuted, setIsMuted] = useState(false);
   const [isBuffering, setIsBuffering] = useState(true);
+  const [videoUrl, setVideoUrl] = useState(url);
   const playerRef = useRef<ReactPlayer>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -123,38 +153,99 @@ const VideoPlayer = ({
     }
   };
   
+  // Process and update video URL when it changes
+  useEffect(() => {
+    try {
+      if (url) {
+        const processedUrl = getProperYoutubeUrl(url);
+        console.log("Original URL:", url);
+        console.log("Processed URL:", processedUrl);
+        setVideoUrl(processedUrl);
+      }
+      // Reset buffering state when URL changes
+      setIsBuffering(true);
+    } catch (error) {
+      console.error("Error processing video URL:", error);
+      // Keep the original URL if there's an error
+      setVideoUrl(url);
+    }
+  }, [url]);
+  
+  // Handle player errors
+  const handlePlayerError = (error: any) => {
+    console.error("Video player error:", error);
+    setIsBuffering(false);
+    toast({
+      title: "Video Error",
+      description: "There was a problem loading the video. Please check the URL and try again.",
+      variant: "destructive",
+    });
+  };
+  
+  // Handle player ready state
+  const handlePlayerReady = () => {
+    console.log("Video player is ready");
+    setIsBuffering(false);
+    
+    // Start playing if we're supposed to be playing
+    if (isPlaying && playerRef.current) {
+      playerRef.current.getInternalPlayer()?.playVideo?.();
+    }
+  };
+  
   return (
     <div
       ref={containerRef}
       className="video-container relative flex-1 flex items-center justify-center bg-black"
     >
-      <ReactPlayer
-        ref={playerRef}
-        url={url}
-        width="100%"
-        height="100%"
-        playing={isPlaying}
-        volume={isMuted ? 0 : volume}
-        onDuration={handleDuration}
-        onProgress={handleProgress}
-        onBuffer={() => setIsBuffering(true)}
-        onBufferEnd={() => setIsBuffering(false)}
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-        style={{ position: "absolute", top: 0, left: 0 }}
-        config={{
-          youtube: {
-            playerVars: { modestbranding: 1 },
-          },
-          file: {
-            attributes: {
-              style: {
-                objectFit: "contain",
-              },
+      {videoUrl && (
+        <ReactPlayer
+          ref={playerRef}
+          url={videoUrl}
+          width="100%"
+          height="100%"
+          playing={isPlaying}
+          volume={isMuted ? 0 : volume}
+          onDuration={handleDuration}
+          onProgress={handleProgress}
+          onBuffer={() => setIsBuffering(true)}
+          onBufferEnd={() => setIsBuffering(false)}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onReady={handlePlayerReady}
+          onError={handlePlayerError}
+          style={{ position: "absolute", top: 0, left: 0 }}
+          controls={false}
+          playsinline={true}
+          fallback={
+            <div className="w-full h-full flex items-center justify-center bg-black">
+              <p className="text-white">Unable to load video player</p>
+            </div>
+          }
+          config={{
+            youtube: {
+              playerVars: { 
+                modestbranding: 1,
+                origin: window.location.origin,
+                autoplay: isPlaying ? 1 : 0,
+                controls: 0,
+                rel: 0,
+                showinfo: 0,
+                iv_load_policy: 3,
+                fs: 0
+              }
             },
-          },
-        }}
-      />
+            file: {
+              attributes: {
+                style: {
+                  objectFit: "contain",
+                }
+              },
+              forceVideo: true,
+            },
+          }}
+        />
+      )}
       
       {/* Loading overlay */}
       {isBuffering && (
